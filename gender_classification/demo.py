@@ -5,61 +5,76 @@ import numpy as np
 from torch import nn
 import torch.nn.functional as F
 # from model.tmp_CNN import ConvNet
-
-class ConvNet(nn.Module):
-    def __init__(self):
-        super(ConvNet, self).__init__()
-        self.pool = nn.MaxPool2d(2, 2)  # KERNEL SIZE 2, STRIDE 2
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1)  # COLOR CHANNEL(INPUT) 3, OUTPUTCHANNEL 6, KERNEL SIZE 5
-        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1)
-        self.conv3 = nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1)
-        self.conv4 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=1)  # COLOR CHANNEL(INPUT) 3, OUTPUTCHANNEL 6, KERNEL SIZE 5
-        self.fc1 = nn.Linear(512 * 3 * 2 * 3 * 2, 512)  # INPUT 16 * 5 * 5, OUTPUT 120
-        self.fc2 = nn.Linear(512, 256)  # INPUT 120, OUTPUT 84
-        self.fc3 = nn.Linear(256, 64) # INPUT 84, OUTPUT 10
-        self.fc4 = nn.Linear(64, 2)
-
-    def forward(self, x):
-        # -> n, 3, 32, 32
-        x = self.pool(F.relu(self.conv1(x)))  # -> n, 6, 14, 14
-        x = self.pool(F.relu(self.conv2(x)))  # -> n, 16, 5, 5
-        x = self.pool(F.relu(self.conv3(x)))  # -> n, 16, 5, 5
-        x = self.pool(F.relu(self.conv4(x)))  # -> n, 16, 5, 5
-        x = x.view(-1, 512 * 3 * 2 * 3 * 2)  # -> n, 400
-        x = F.relu(self.fc1(x))  # -> n, 120
-        x = F.relu(self.fc2(x))  # -> n, 84
-        x = F.relu(self.fc3(x))  # -> n, 84
-        x = self.fc4(x)  # -> n, 10
-        return x
-
-model_path = "./model/CNN_gender_5.pth"
-img_path = "./2020-11-27.jpg"
+from gender_classification.model.CNN_gender_2 import ConvNet
+from gender_classification.model.CNN_age import ConvNet as Net2
+gender_model_path = 'C:/Users/정선우/PycharmProjects/trained_model/GENDER/imdb_cnn20.pth'
+age_model_path = 'C:/Users/정선우/PycharmProjects/trained_model/AGE/imdb_age_100.pth'
+img_path = "D:/dataset/FOR_DEMO/KakaoTalk_20201229_180803051.jpg"
+img_name = img_path.split('/')[3]
+img_Folder = img_path.split('/')[:3]
+img_Folder_path = "/".join(img_Folder) + "/result/"
 
 device = torch.device('cpu')
-model = ConvNet()
-model.load_state_dict(torch.load(model_path, map_location=device))
-model.eval()
+gender_model = ConvNet()
+age_model = Net2()
+gender_model.load_state_dict(torch.load(gender_model_path, map_location=device))
+age_model.load_state_dict(torch.load(age_model_path, map_location=device))
 
+gender_classes = ('man', 'woman')
+age_classes = ('0','10', '20','30','40','50','60','70','80','90')
 
+def img_processing(img):
+    resize_img = cv2.resize(img, dsize=(224, 224), interpolation=cv2.INTER_AREA)
+    gray_img = cv2.cvtColor(resize_img, cv2.COLOR_RGB2GRAY)
+    new_img = np.asarray(gray_img)
+    dim_1 = np.expand_dims(new_img, axis=0)
+    dim_2 = np.expand_dims(dim_1, axis=0)
+    final_img = torch.from_numpy(dim_2)
+    return final_img
 
+def gender_classify(img):
+    img = img.float()
+    outputs = gender_model(img)
+
+    result = torch.argmax(outputs)
+    print("answer is ", gender_classes[result])
+    return result
+def age_classify(img):
+    img = img.float()
+    outputs = age_model(img)
+
+    result = torch.argmax(outputs)
+    print("answer is ", age_classes[result])
+    return result
+
+gender_model.eval()
+age_model.eval()
+#face detection
 face_detector = dlib.get_frontal_face_detector()
-img = cv2.imread(img_path)
-img = torch.tensor(img)
-# img.xtype(torch.FloatTensor)
-print(model(img))
+dst = cv2.imread(img_path)
+img = dst
+
 faces = face_detector(img)
-outputs = []
 print("{} faces are detected.".format(len(faces)))
-face_crop = []
+font = cv2.FONT_HERSHEY_DUPLEX  # 텍스트의 폰트를 지정.
+
 for f in faces:
     # print(f.left(), f.right(), f.top(), f.bottom())
+    print("cropping")
     crop = (img[f.top():f.bottom(),f.left():f.right()])
     cv2.rectangle(img, (f.left(), f.top()), (f.right(), f.bottom()), (0,0,255), 2)
-    cv2.imshow("img", crop)
-    cv2.waitKey()
-    face_crop.append(crop)
+    final_img = img_processing(crop)
+    print("put img in model")
+    gender_result = gender_classify(final_img)
+    age_result = age_classify(final_img)
+    cv2.putText(img, "gender is " + gender_classes[gender_result], (f.left(), f.top()-50), font, 0.7, (0, 0, 255),cv2.LINE_4)
+    cv2.putText(img, "age is " + age_classes[age_result], (f.left(), f.top() - 30), font, 0.7, (0, 0, 255),
+                cv2.LINE_4)
+
+
     #print(model(img_face))
-for face in face_crop:
-    print(model(face))
-# cv2.imshow("img", img)
-cv2.imwrite("output.jpg", img)
+
+cv2.imshow("img", img)
+cv2.waitKey(0)
+cv2.imwrite(img_Folder_path + img_name.split('.jpg')[0] + "_gender&age classify" + ".jpg", img)
+

@@ -6,8 +6,5 @@
 
 
 
+CONVOLUTION NEURAL NETWORK을 이용하여 GENDER CLASSIFICATION 분류기 학습
 
-
-https://github.com/hysts/pytorch_image_classification 
-
-위의 코드로 CIFAR-10 데이터셋에 대한 실습

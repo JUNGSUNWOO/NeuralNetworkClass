@@ -21,7 +21,7 @@ class ConvNet(nn.Module):
         self.dropout1 = nn.Dropout2d(0.5)
         self.fc2 = nn.Linear(512, 512)
         self.dropout2 = nn.Dropout2d(0.5)
-        self.fc3 = nn.Linear(512, 10)
+        self.fc3 = nn.Linear(512, 2)
 
     def forward(self, x):
         x = self.maxPool1(F.relu(self.conv1(x)))
